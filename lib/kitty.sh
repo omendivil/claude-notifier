@@ -10,6 +10,14 @@ kitty_set_tab_color() {
   fi
 }
 
+kitty_set_tab_title() {
+  if [[ -n "${KITTY_WINDOW_ID:-}" ]]; then
+    kitten @ set-tab-title --match "id:${KITTY_WINDOW_ID}" "$@" 2>/dev/null
+  else
+    kitten @ set-tab-title --match "pid:$PPID" "$@" 2>/dev/null
+  fi
+}
+
 kitty_notify() {
   kitten notify "$@" 2>/dev/null
 }

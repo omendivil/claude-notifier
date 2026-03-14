@@ -98,6 +98,16 @@ if [[ "$STATE" == "working" ]]; then
   echo "$now" > "$DEBOUNCE_FILE"
 fi
 
+# ── Set tab title ────────────────────────────────
+source "${LIB_DIR}/kitty.sh"
+case "$STATE" in
+  permission) kitty_set_tab_title "⛔ Permission Needed" ;;
+  done)       kitty_set_tab_title "✅ Done" ;;
+  idle)       kitty_set_tab_title "💤 Idle" ;;
+  working)    kitty_set_tab_title "⚡ Working..." ;;
+  normal)     kitty_set_tab_title "" ;;
+esac
+
 # ── Dispatch to enabled modes ────────────────────
 if [[ "${NOTIFY_BLINK:-true}" == "true" ]]; then
   source "${LIB_DIR}/blink.sh"

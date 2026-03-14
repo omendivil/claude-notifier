@@ -9,13 +9,13 @@ set_state_color() {
 
   case "$state" in
     permission)
-      kitty_set_tab_color active_bg="${COLOR_PERMISSION:-#ff9500}"
+      kitty_set_tab_color active_bg="${COLOR_PERMISSION:-#ff003c}"
       ;;
     done|idle)
-      kitty_set_tab_color active_bg="${COLOR_DONE:-#34c759}"
+      kitty_set_tab_color active_bg="${COLOR_DONE:-#00ffd5}"
       ;;
     working)
-      kitty_set_tab_color active_bg="${COLOR_WORKING:-#007aff}"
+      kitty_set_tab_color active_bg="${COLOR_WORKING:-#b026ff}"
       ;;
     normal)
       kitty_set_tab_color active_bg=NONE
