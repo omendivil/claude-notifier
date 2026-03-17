@@ -41,7 +41,15 @@
 
 - [ ] **Step 1: Update defaults in lib/config.sh**
 
-Add after line 17 (`DEBOUNCE_WORKING=3`):
+First, fix the stale hardcoded color defaults (lines 12-14) to match `default.conf`:
+
+```bash
+COLOR_PERMISSION="#ff003c"
+COLOR_DONE="#00ffd5"
+COLOR_WORKING="#b026ff"
+```
+
+Then add after line 17 (`DEBOUNCE_WORKING=3`):
 
 ```bash
 COLOR_RESEARCHING="#007aff"
@@ -471,13 +479,6 @@ echo "Test 12: ensure_daemon starts a daemon process"
 # Create a simple daemon script that writes a marker file
 MOCK_DAEMON="${TMPDIR_TEST}/mock-daemon"
 DAEMON_MARKER="${TMPDIR_TEST}/daemon-started"
-cat > "$MOCK_DAEMON" << 'DEOF'
-#!/usr/bin/env bash
-touch "$1"
-sleep 10
-DEOF
-chmod +x "$MOCK_DAEMON"
-# Patch the daemon to write marker
 cat > "$MOCK_DAEMON" << DEOF
 #!/usr/bin/env bash
 touch "${DAEMON_MARKER}"
@@ -579,19 +580,21 @@ is_stuck_command() {
 
   [[ -z "$command" || -z "$patterns" ]] && return 1
 
-  # Tokenize the command
-  local -a tokens
+  # Tokenize the command (no local -a, incompatible with bash 3.2)
+  local tokens
+  local IFS=' '
   read -ra tokens <<< "$command"
   local num_tokens=${#tokens[@]}
 
   # Check each pattern (pipe-delimited)
-  local IFS='|'
-  local -a pattern_list
+  local pattern_list
+  IFS='|'
   read -ra pattern_list <<< "$patterns"
+  IFS=' '
 
   for pattern in "${pattern_list[@]}"; do
     # Count words in pattern
-    local -a pattern_words
+    local pattern_words
     read -ra pattern_words <<< "$pattern"
     local pattern_len=${#pattern_words[@]}
 
@@ -646,7 +649,7 @@ extract_command_keyword() {
   # "npm install react" → "npm"
   # "/usr/bin/npm install" → "npm"
   local command="$1"
-  local -a tokens
+  local tokens
   read -ra tokens <<< "$command"
   local binary="${tokens[0]}"
   # Strip path prefix
@@ -1095,9 +1098,10 @@ poll_sessions() {
     idle_timeout="${idle_timeout%%.*}"
     if [[ "$state" == "done" || "$state" == "waiting" ]] && [[ $elapsed -gt $idle_timeout ]]; then
       if [[ -n "$kitty_window_id" ]]; then
-        # Blink reminder
+        # Blink reminder (1 slow pulse)
+        local blink_slow="${BLINK_SLOW:-0.3}"
         kitty_set_tab_color_by_id "$kitty_window_id" active_bg="#ffffff"
-        sleep 0.3
+        sleep "$blink_slow"
         kitty_set_tab_color_by_id "$kitty_window_id" active_bg=NONE
         # Set idle state
         kitty_set_tab_title_by_id "$kitty_window_id" "💤 Idle"
@@ -1282,7 +1286,24 @@ HOOKS_JSON=$(jq -n --arg cmd "$NOTIFIER_CMD" '{
 }')
 ```
 
-Also update the merge logic to handle all new hook event types (add `UserPromptSubmit`, `PostToolUse`, `PostToolUseFailure`, `SubagentStart`, `SubagentStop`, `SessionEnd` to the jq merge).
+Replace the jq merge logic (lines 87-94) with:
+
+```bash
+  MERGED=$(jq --argjson new_hooks "$HOOKS_JSON" '
+    .hooks = (
+      (.hooks // {}) |
+      .UserPromptSubmit = ((.UserPromptSubmit // []) + $new_hooks.UserPromptSubmit) |
+      .Notification = ((.Notification // []) + $new_hooks.Notification) |
+      .Stop = ((.Stop // []) + $new_hooks.Stop) |
+      .PreToolUse = ((.PreToolUse // []) + $new_hooks.PreToolUse) |
+      .PostToolUse = ((.PostToolUse // []) + $new_hooks.PostToolUse) |
+      .PostToolUseFailure = ((.PostToolUseFailure // []) + $new_hooks.PostToolUseFailure) |
+      .SubagentStart = ((.SubagentStart // []) + $new_hooks.SubagentStart) |
+      .SubagentStop = ((.SubagentStop // []) + $new_hooks.SubagentStop) |
+      .SessionEnd = ((.SessionEnd // []) + $new_hooks.SessionEnd)
+    )
+  ' "$SETTINGS_FILE")
+```
 
 - [ ] **Step 3: Update uninstall.sh — kill daemon, clean sessions**
 
@@ -1302,11 +1323,15 @@ fi
 rm -rf "${INSTALL_DIR}/.daemon.lock"
 ```
 
-In the file removal section, add session cleanup:
+In the partial-removal path (line 70-71, where `config.conf` is preserved), add the new directories/files:
 
 ```bash
-rm -rf "${INSTALL_DIR}/sessions"
+      rm -rf "${INSTALL_DIR}/bin" "${INSTALL_DIR}/lib" "${INSTALL_DIR}/sessions"
+      rm -f "${INSTALL_DIR}/.blink.pid" "${INSTALL_DIR}/.last-working-notify" "${INSTALL_DIR}/.daemon.pid"
+      rm -rf "${INSTALL_DIR}/.daemon.lock"
 ```
+
+The full-removal path (`rm -rf "$INSTALL_DIR"`) already covers everything.
 
 - [ ] **Step 4: Run tests**
 
