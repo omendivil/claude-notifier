@@ -29,11 +29,17 @@ send_notification() {
       [[ -z "$message" ]] && message="Claude needs permission"
       kitty_notify --title "Claude Code" "$message"
       ;;
-    done|idle)
-      kitty_notify --title "Claude Code" "Claude is ready"
+    error)
+      local error_msg
+      error_msg=$(_extract_message "$stdin_json")
+      [[ -z "$error_msg" ]] && error_msg="A tool encountered an error"
+      kitty_notify --title "Claude Code" "$error_msg"
       ;;
-    working)
-      # No desktop notification for working state — too noisy
+    done)
+      kitty_notify --title "Claude Code" "Claude is done"
+      ;;
+    working|researching|waiting|idle|normal)
+      # No desktop notification for these states
       ;;
   esac
 }
