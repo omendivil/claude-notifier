@@ -9,12 +9,17 @@ CLAUDE_NOTIFIER_CONF="${CLAUDE_NOTIFIER_DIR}/config.conf"
 NOTIFY_BLINK=true
 NOTIFY_COLOR=false
 NOTIFY_DESKTOP=false
-COLOR_PERMISSION="#ff9500"
-COLOR_DONE="#34c759"
-COLOR_WORKING="#007aff"
+COLOR_PERMISSION="#ff003c"
+COLOR_DONE="#00ffd5"
+COLOR_WORKING="#b026ff"
 BLINK_FAST=0.1
 BLINK_SLOW=0.3
 DEBOUNCE_WORKING=3
+COLOR_RESEARCHING="#007aff"
+COLOR_ERROR="#ff6b00"
+IDLE_TIMEOUT=300
+STUCK_TIMEOUT=180
+STUCK_COMMANDS="install|init|create-|run dev|run start|serve"
 
 load_config() {
   if [[ ! -f "$CLAUDE_NOTIFIER_CONF" ]]; then
@@ -47,15 +52,21 @@ load_config() {
           continue
         fi
         ;;
-      COLOR_PERMISSION|COLOR_DONE|COLOR_WORKING)
+      COLOR_PERMISSION|COLOR_DONE|COLOR_WORKING|COLOR_RESEARCHING|COLOR_ERROR)
         if ! [[ "$value" =~ ^#[0-9a-fA-F]{6}$ ]]; then
           echo "claude-notifier: invalid color for $key: $value (expected #rrggbb)" >&2
           continue
         fi
         ;;
-      BLINK_FAST|BLINK_SLOW|DEBOUNCE_WORKING)
+      BLINK_FAST|BLINK_SLOW|DEBOUNCE_WORKING|IDLE_TIMEOUT|STUCK_TIMEOUT)
         if ! [[ "$value" =~ ^[0-9]+\.?[0-9]*$ ]]; then
           echo "claude-notifier: invalid number for $key: $value" >&2
+          continue
+        fi
+        ;;
+      STUCK_COMMANDS)
+        if ! [[ "$value" =~ ^[a-zA-Z0-9\ \|\-]+$ ]]; then
+          echo "claude-notifier: invalid pattern for $key: $value" >&2
           continue
         fi
         ;;

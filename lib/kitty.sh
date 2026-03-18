@@ -21,3 +21,14 @@ kitty_set_tab_title() {
 kitty_notify() {
   kitten notify "$@" 2>/dev/null
 }
+
+# ── Daemon helpers (target by window ID, not --self) ──
+kitty_set_tab_color_by_id() {
+  local window_id="$1"; shift
+  kitten @ set-tab-color --match "id:${window_id}" "$@" 2>/dev/null
+}
+
+kitty_set_tab_title_by_id() {
+  local window_id="$1"; shift
+  kitten @ set-tab-title --match "id:${window_id}" "$@" 2>/dev/null
+}

@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Claude Notifier — main dispatcher
+# Claude Notifier v2.0.0 — main dispatcher
 # Called by Claude Code hooks to signal state changes to Kitty tabs
 #
-# Usage: claude-notifier --state <permission|done|idle|working|normal>
+# Usage: claude-notifier --state <state> [--stdin]
+#        claude-notifier --cleanup --stdin
 #        claude-notifier --test
 #        claude-notifier --version
 
@@ -14,6 +15,8 @@ CLAUDE_NOTIFIER_DIR="${HOME}/.config/claude-notifier"
 
 # ── Parse arguments ──────────────────────────────
 STATE=""
+READ_STDIN=false
+CLEANUP_MODE=false
 TEST_MODE=false
 
 while [[ $# -gt 0 ]]; do
@@ -23,18 +26,29 @@ while [[ $# -gt 0 ]]; do
       STATE="$2"
       shift 2
       ;;
+    --stdin)
+      READ_STDIN=true
+      shift
+      ;;
+    --cleanup)
+      CLEANUP_MODE=true
+      shift
+      ;;
     --test)
       TEST_MODE=true
       shift
       ;;
     --version)
-      echo "claude-notifier 1.0.0"
+      echo "claude-notifier 2.0.0"
       exit 0
       ;;
     --help|-h)
-      echo "Usage: claude-notifier --state <permission|done|idle|working|normal>"
+      echo "Usage: claude-notifier --state <state> [--stdin]"
+      echo "       claude-notifier --cleanup --stdin"
       echo "       claude-notifier --test    Run a test blink"
       echo "       claude-notifier --version Show version"
+      echo ""
+      echo "States: working, permission, researching, error, done, waiting, idle, normal"
       exit 0
       ;;
     *)
@@ -56,6 +70,39 @@ if [[ "$TEST_MODE" == "true" ]]; then
   exit 0
 fi
 
+# ── Read stdin JSON ──────────────────────────────
+STDIN_JSON=""
+if [[ "$READ_STDIN" == "true" && ! -t 0 ]]; then
+  STDIN_JSON=$(cat)
+elif [[ ! -t 0 ]]; then
+  # Backwards compat: read stdin even without --stdin flag
+  STDIN_JSON=$(cat)
+fi
+
+# ── Extract fields from JSON ─────────────────────
+SESSION_ID=""
+TOOL_NAME=""
+TOOL_COMMAND=""
+TOOL_USE_ID=""
+if [[ -n "$STDIN_JSON" ]] && command -v jq &>/dev/null; then
+  SESSION_ID=$(echo "$STDIN_JSON" | jq -r '.session_id // empty' 2>/dev/null || true)
+  TOOL_NAME=$(echo "$STDIN_JSON" | jq -r '.tool_name // empty' 2>/dev/null || true)
+  TOOL_COMMAND=$(echo "$STDIN_JSON" | jq -r '.tool_input.command // empty' 2>/dev/null || true)
+  TOOL_USE_ID=$(echo "$STDIN_JSON" | jq -r '.tool_use_id // empty' 2>/dev/null || true)
+fi
+
+# ── Cleanup mode ─────────────────────────────────
+if [[ "$CLEANUP_MODE" == "true" ]]; then
+  source "${LIB_DIR}/kitty.sh"
+  kitty_set_tab_title ""
+  kitty_set_tab_color active_bg=NONE
+  if [[ -n "$SESSION_ID" ]]; then
+    source "${LIB_DIR}/state.sh"
+    remove_state_file "$SESSION_ID"
+  fi
+  exit 0
+fi
+
 # ── Validate state ───────────────────────────────
 if [[ -z "$STATE" ]]; then
   echo "claude-notifier: --state is required" >&2
@@ -63,29 +110,41 @@ if [[ -z "$STATE" ]]; then
 fi
 
 case "$STATE" in
-  permission|done|idle|working|normal) ;;
+  permission|done|waiting|idle|working|researching|error|normal) ;;
   *)
     echo "claude-notifier: unknown state: $STATE" >&2
     exit 1
     ;;
 esac
 
-# ── Capture stdin JSON ───────────────────────────
-STDIN_JSON=""
-if [[ ! -t 0 ]]; then
-  STDIN_JSON=$(cat)
-fi
-
 # ── Load config ──────────────────────────────────
 source "${LIB_DIR}/config.sh"
 load_config
 
-# ── Debounce (working state only) ────────────────
+# ── Write state file (always, regardless of debounce) ──
+if [[ -n "$SESSION_ID" ]]; then
+  source "${LIB_DIR}/state.sh"
+  # For working state with a Bash tool, pass the command for stuck detection
+  local_command=""
+  local_tool_id=""
+  if [[ "$STATE" == "working" && "$TOOL_NAME" == "Bash" ]]; then
+    local_command="$TOOL_COMMAND"
+    local_tool_id="$TOOL_USE_ID"
+  fi
+  write_state_file "$SESSION_ID" "$STATE" "$local_command" "$local_tool_id"
+
+  # Ensure daemon is running
+  DAEMON_SCRIPT="${SCRIPT_DIR}/claude-notifier-daemon"
+  if [[ -x "$DAEMON_SCRIPT" ]]; then
+    ensure_daemon "$DAEMON_SCRIPT"
+  fi
+fi
+
+# ── Debounce visual updates (working state only) ──
 if [[ "$STATE" == "working" ]]; then
   mkdir -p "$CLAUDE_NOTIFIER_DIR"
   DEBOUNCE_FILE="${CLAUDE_NOTIFIER_DIR}/.last-working-notify"
   now=$(date +%s)
-  # Truncate to integer (config allows floats like 3.5, but bash arithmetic needs ints)
   debounce_sec="${DEBOUNCE_WORKING:-3}"
   debounce_sec="${debounce_sec%%.*}"
   if [[ -f "$DEBOUNCE_FILE" ]]; then
@@ -101,11 +160,14 @@ fi
 # ── Set tab title ────────────────────────────────
 source "${LIB_DIR}/kitty.sh"
 case "$STATE" in
-  permission) kitty_set_tab_title "⛔ Permission Needed" ;;
-  done)       kitty_set_tab_title "✅ Done" ;;
-  idle)       kitty_set_tab_title "💤 Idle" ;;
-  working)    kitty_set_tab_title "⚡ Working..." ;;
-  normal)     kitty_set_tab_title "" ;;
+  permission)   kitty_set_tab_title "⛔ Perm" ;;
+  done)         kitty_set_tab_title "✅ Done" ;;
+  waiting)      kitty_set_tab_title "⏳ Wait" ;;
+  idle)         kitty_set_tab_title "💤 Idle" ;;
+  working)      kitty_set_tab_title "⚡ Work" ;;
+  researching)  kitty_set_tab_title "🔍 Research" ;;
+  error)        kitty_set_tab_title "❌ Error" ;;
+  normal)       kitty_set_tab_title "" ;;
 esac
 
 # ── Dispatch to enabled modes ────────────────────

@@ -13,6 +13,7 @@ FAKE_CONFIG_DIR="${TMPDIR_TEST}/config"
 FAKE_CLAUDE_DIR="${TMPDIR_TEST}/claude-config"
 
 mkdir -p "$FAKE_CONFIG_DIR" "$FAKE_CLAUDE_DIR"
+mkdir -p "${TMPDIR_TEST}/.config/claude-notifier/sessions"
 
 # Create mock kitten that logs calls
 cat > "$MOCK_KITTEN" << 'MOCKEOF'
@@ -108,7 +109,7 @@ rm -f "${TMPDIR_TEST}/.config/claude-notifier/.last-working-notify"
 > "$MOCK_LOG"
 echo "" | "$NOTIFIER" --state permission
 sleep 1.5
-assert_contains "sets amber color" "#ff9500" "$MOCK_LOG"
+assert_contains "sets red color" "#ff003c" "$MOCK_LOG"
 
 # ── Test 6: Desktop notification ─────────────────
 echo "Test 6: Desktop notification — permission state with JSON"
@@ -131,7 +132,7 @@ assert_not_contains "no notify call for working" "notify.*Claude" "$MOCK_LOG"
 # ── Test 8: Version flag ─────────────────────────
 echo "Test 8: --version flag"
 version_output=$("$NOTIFIER" --version)
-if [[ "$version_output" == "claude-notifier 1.0.0" ]]; then
+if [[ "$version_output" == "claude-notifier 2.0.0" ]]; then
   echo "  PASS: version output correct"
   ((PASS++)) || true
 else
@@ -157,6 +158,266 @@ rm -f "${TMPDIR_TEST}/.config/claude-notifier/.last-working-notify"
 echo "" | "$NOTIFIER" --state working
 sleep 0.5
 assert_contains "uses --match pid fallback" "--match" "$MOCK_LOG"
+
+# ── Test 11: State file write and read ────────
+echo "Test 11: State file write and read"
+export KITTY_WINDOW_ID="12345"
+SESSIONS_DIR="${TMPDIR_TEST}/.config/claude-notifier/sessions"
+mkdir -p "$SESSIONS_DIR"
+source "${PROJECT_DIR}/lib/state.sh"
+write_state_file "test-session-1" "working" "npm install" "toolu_abc"
+if [[ -f "${SESSIONS_DIR}/test-session-1.state" ]]; then
+  echo "  PASS: state file created"
+  ((PASS++)) || true
+else
+  echo "  FAIL: state file not created"
+  ((FAIL++)) || true
+fi
+state_content=$(cat "${SESSIONS_DIR}/test-session-1.state")
+if echo "$state_content" | grep -q "state=working"; then
+  echo "  PASS: state file contains correct state"
+  ((PASS++)) || true
+else
+  echo "  FAIL: state file missing state=working"
+  ((FAIL++)) || true
+fi
+if echo "$state_content" | grep -q "kitty_window_id=12345"; then
+  echo "  PASS: state file contains window ID"
+  ((PASS++)) || true
+else
+  echo "  FAIL: state file missing kitty_window_id"
+  ((FAIL++)) || true
+fi
+rm -f "${SESSIONS_DIR}/test-session-1.state"
+
+# ── Test 12: ensure_daemon starts daemon ──────
+echo "Test 12: ensure_daemon starts a daemon process"
+# Create a simple daemon script that writes a marker file
+MOCK_DAEMON="${TMPDIR_TEST}/mock-daemon"
+DAEMON_MARKER="${TMPDIR_TEST}/daemon-started"
+cat > "$MOCK_DAEMON" << DEOF
+#!/usr/bin/env bash
+touch "${DAEMON_MARKER}"
+sleep 10
+DEOF
+chmod +x "$MOCK_DAEMON"
+rm -f "$DAEMON_MARKER"
+rm -f "${TMPDIR_TEST}/.config/claude-notifier/.daemon.pid"
+rm -rf "${TMPDIR_TEST}/.config/claude-notifier/.daemon.lock"
+ensure_daemon "$MOCK_DAEMON"
+sleep 0.5
+if [[ -f "$DAEMON_MARKER" ]]; then
+  echo "  PASS: daemon was started"
+  ((PASS++)) || true
+else
+  echo "  FAIL: daemon was not started"
+  ((FAIL++)) || true
+fi
+# Clean up daemon (disown to suppress Terminated message under set -e)
+if [[ -f "${TMPDIR_TEST}/.config/claude-notifier/.daemon.pid" ]]; then
+  local_pid=$(cat "${TMPDIR_TEST}/.config/claude-notifier/.daemon.pid" 2>/dev/null)
+  if [[ -n "$local_pid" ]] && kill -0 "$local_pid" 2>/dev/null; then
+    disown "$local_pid" 2>/dev/null || true
+    kill "$local_pid" 2>/dev/null || true
+    sleep 0.2
+  fi
+fi
+
+# ── Test 13: Stuck command matching ───────────
+echo "Test 13: Stuck command matching"
+source "${PROJECT_DIR}/lib/stuck.sh"
+# Should match
+if is_stuck_command "npm install react" "install|init|create-|run dev|run start|serve"; then
+  echo "  PASS: npm install matched"
+  ((PASS++)) || true
+else
+  echo "  FAIL: npm install should match"
+  ((FAIL++)) || true
+fi
+if is_stuck_command "yarn run dev --port 3000" "install|init|create-|run dev|run start|serve"; then
+  echo "  PASS: yarn run dev matched"
+  ((PASS++)) || true
+else
+  echo "  FAIL: yarn run dev should match"
+  ((FAIL++)) || true
+fi
+# Should NOT match
+if is_stuck_command "npm run build" "install|init|create-|run dev|run start|serve"; then
+  echo "  FAIL: npm run build should NOT match"
+  ((FAIL++)) || true
+else
+  echo "  PASS: npm run build not matched"
+  ((PASS++)) || true
+fi
+if is_stuck_command "git commit -m 'fix bug'" "install|init|create-|run dev|run start|serve"; then
+  echo "  FAIL: git commit should NOT match"
+  ((FAIL++)) || true
+else
+  echo "  PASS: git commit not matched"
+  ((PASS++)) || true
+fi
+
+# ── Test 14: Elapsed time formatting ──────────
+echo "Test 14: Elapsed time formatting"
+result=$(format_elapsed 30)
+if [[ "$result" == "30s" ]]; then
+  echo "  PASS: 30s formatted"
+  ((PASS++)) || true
+else
+  echo "  FAIL: expected 30s, got $result"
+  ((FAIL++)) || true
+fi
+result=$(format_elapsed 180)
+if [[ "$result" == "3m" ]]; then
+  echo "  PASS: 3m formatted"
+  ((PASS++)) || true
+else
+  echo "  FAIL: expected 3m, got $result"
+  ((FAIL++)) || true
+fi
+result=$(format_elapsed 7200)
+if [[ "$result" == "2h" ]]; then
+  echo "  PASS: 2h formatted"
+  ((PASS++)) || true
+else
+  echo "  FAIL: expected 2h, got $result"
+  ((FAIL++)) || true
+fi
+
+# ── Test 15: New states accepted ──────────────
+echo "Test 15: New states accepted (researching, error, waiting)"
+export KITTY_WINDOW_ID="12345"
+rm -f "${TMPDIR_TEST}/.config/claude-notifier/.last-working-notify"
+for new_state in researching error waiting; do
+  > "$MOCK_LOG"
+  echo '{"session_id":"test-123"}' | "$NOTIFIER" --state "$new_state" --stdin
+  sleep 0.3
+  if grep -q "set-tab-title" "$MOCK_LOG" 2>/dev/null; then
+    echo "  PASS: $new_state state accepted"
+    ((PASS++)) || true
+  else
+    echo "  FAIL: $new_state state not accepted"
+    ((FAIL++)) || true
+  fi
+done
+
+# ── Test 16: Daemon idle transition ───────────
+echo "Test 16: Daemon transitions done -> idle after timeout"
+export KITTY_WINDOW_ID="12345"
+SESSIONS_DIR="${TMPDIR_TEST}/.config/claude-notifier/sessions"
+mkdir -p "$SESSIONS_DIR"
+> "$MOCK_LOG"
+# Write a state file with old timestamp (simulate 10 minutes ago)
+old_ts=$(( $(date +%s) - 600 ))
+cat > "${SESSIONS_DIR}/daemon-test-1.state" << EOF
+state=done
+timestamp=${old_ts}
+kitty_window_id=12345
+command=
+tool_use_id=
+alerted=false
+EOF
+# Run one daemon cycle with short timeout
+IDLE_TIMEOUT=2
+STUCK_TIMEOUT=999
+STUCK_COMMANDS="install"
+source "${PROJECT_DIR}/lib/config.sh"
+source "${PROJECT_DIR}/lib/kitty.sh"
+source "${PROJECT_DIR}/lib/stuck.sh"
+source "${PROJECT_DIR}/bin/claude-notifier-daemon" --test-poll
+sleep 1
+# Check state file was updated to idle
+if grep -q "state=idle" "${SESSIONS_DIR}/daemon-test-1.state" 2>/dev/null; then
+  echo "  PASS: state transitioned to idle"
+  ((PASS++)) || true
+else
+  echo "  FAIL: state not transitioned to idle"
+  ((FAIL++)) || true
+fi
+if grep -q "set-tab-title" "$MOCK_LOG" 2>/dev/null; then
+  echo "  PASS: tab title was updated"
+  ((PASS++)) || true
+else
+  echo "  FAIL: tab title not updated"
+  ((FAIL++)) || true
+fi
+rm -f "${SESSIONS_DIR}/daemon-test-1.state"
+
+# ── Test 17: Daemon stuck detection ───────────
+echo "Test 17: Daemon detects stuck command"
+> "$MOCK_LOG"
+old_ts=$(( $(date +%s) - 300 ))
+cat > "${SESSIONS_DIR}/daemon-test-2.state" << EOF
+state=working
+timestamp=${old_ts}
+kitty_window_id=12345
+command=npm install react
+tool_use_id=toolu_abc
+alerted=false
+EOF
+IDLE_TIMEOUT=999
+STUCK_TIMEOUT=2
+source "${PROJECT_DIR}/bin/claude-notifier-daemon" --test-poll
+sleep 0.5
+if grep -q "set-tab-title.*npm" "$MOCK_LOG" 2>/dev/null; then
+  echo "  PASS: stuck title updated"
+  ((PASS++)) || true
+else
+  echo "  FAIL: stuck title not updated"
+  ((FAIL++)) || true
+fi
+if grep -q "alerted=true" "${SESSIONS_DIR}/daemon-test-2.state" 2>/dev/null; then
+  echo "  PASS: alerted flag set"
+  ((PASS++)) || true
+else
+  echo "  FAIL: alerted flag not set"
+  ((FAIL++)) || true
+fi
+rm -f "${SESSIONS_DIR}/daemon-test-2.state"
+
+# ── Test 18: Full state lifecycle ─────────────
+echo "Test 18: Full state lifecycle (working → permission → working → done → cleanup)"
+export KITTY_WINDOW_ID="12345"
+rm -f "${TMPDIR_TEST}/.config/claude-notifier/.last-working-notify"
+mkdir -p "${TMPDIR_TEST}/.config/claude-notifier/sessions"
+> "$MOCK_LOG"
+
+# Simulate: user submits prompt
+echo '{"session_id":"lifecycle-1"}' | "$NOTIFIER" --state working --stdin
+sleep 0.3
+
+# Simulate: permission needed
+echo '{"session_id":"lifecycle-1","message":"Claude needs permission to use Bash"}' | "$NOTIFIER" --state permission --stdin
+sleep 0.3
+
+# Simulate: tool approved and completed
+rm -f "${TMPDIR_TEST}/.config/claude-notifier/.last-working-notify"
+echo '{"session_id":"lifecycle-1","tool_name":"Bash"}' | "$NOTIFIER" --state working --stdin
+sleep 0.3
+
+# Simulate: Claude finishes
+echo '{"session_id":"lifecycle-1"}' | "$NOTIFIER" --state done --stdin
+sleep 0.3
+
+# Verify state file exists with done state
+if grep -q "state=done" "${TMPDIR_TEST}/.config/claude-notifier/sessions/lifecycle-1.state" 2>/dev/null; then
+  echo "  PASS: lifecycle ended in done state"
+  ((PASS++)) || true
+else
+  echo "  FAIL: lifecycle did not end in done state"
+  ((FAIL++)) || true
+fi
+
+# Simulate: cleanup
+echo '{"session_id":"lifecycle-1"}' | "$NOTIFIER" --cleanup --stdin
+
+if [[ ! -f "${TMPDIR_TEST}/.config/claude-notifier/sessions/lifecycle-1.state" ]]; then
+  echo "  PASS: state file cleaned up"
+  ((PASS++)) || true
+else
+  echo "  FAIL: state file not cleaned up"
+  ((FAIL++)) || true
+fi
 
 # ── Cleanup ──────────────────────────────────────
 rm -rf "$TMPDIR_TEST"
