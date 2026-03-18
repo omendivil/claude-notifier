@@ -13,6 +13,7 @@ FAKE_CONFIG_DIR="${TMPDIR_TEST}/config"
 FAKE_CLAUDE_DIR="${TMPDIR_TEST}/claude-config"
 
 mkdir -p "$FAKE_CONFIG_DIR" "$FAKE_CLAUDE_DIR"
+mkdir -p "${TMPDIR_TEST}/.config/claude-notifier/sessions"
 
 # Create mock kitten that logs calls
 cat > "$MOCK_KITTEN" << 'MOCKEOF'
@@ -108,7 +109,7 @@ rm -f "${TMPDIR_TEST}/.config/claude-notifier/.last-working-notify"
 > "$MOCK_LOG"
 echo "" | "$NOTIFIER" --state permission
 sleep 1.5
-assert_contains "sets amber color" "#ff9500" "$MOCK_LOG"
+assert_contains "sets red color" "#ff003c" "$MOCK_LOG"
 
 # ── Test 6: Desktop notification ─────────────────
 echo "Test 6: Desktop notification — permission state with JSON"
@@ -131,7 +132,7 @@ assert_not_contains "no notify call for working" "notify.*Claude" "$MOCK_LOG"
 # ── Test 8: Version flag ─────────────────────────
 echo "Test 8: --version flag"
 version_output=$("$NOTIFIER" --version)
-if [[ "$version_output" == "claude-notifier 1.0.0" ]]; then
+if [[ "$version_output" == "claude-notifier 2.0.0" ]]; then
   echo "  PASS: version output correct"
   ((PASS++)) || true
 else
@@ -282,6 +283,23 @@ else
   echo "  FAIL: expected 2h, got $result"
   ((FAIL++)) || true
 fi
+
+# ── Test 15: New states accepted ──────────────
+echo "Test 15: New states accepted (researching, error, waiting)"
+export KITTY_WINDOW_ID="12345"
+rm -f "${TMPDIR_TEST}/.config/claude-notifier/.last-working-notify"
+for new_state in researching error waiting; do
+  > "$MOCK_LOG"
+  echo '{"session_id":"test-123"}' | "$NOTIFIER" --state "$new_state" --stdin
+  sleep 0.3
+  if grep -q "set-tab-title" "$MOCK_LOG" 2>/dev/null; then
+    echo "  PASS: $new_state state accepted"
+    ((PASS++)) || true
+  else
+    echo "  FAIL: $new_state state not accepted"
+    ((FAIL++)) || true
+  fi
+done
 
 # ── Cleanup ──────────────────────────────────────
 rm -rf "$TMPDIR_TEST"
