@@ -1,0 +1,150 @@
+#!/usr/bin/env bash
+# Claude Notifier Daemon v2.0.0
+# Single background process that monitors all session state files
+# for time-based transitions (done/waiting -> idle) and stuck command detection.
+#
+# Started by ensure_daemon() in lib/state.sh. Auto-stops when no sessions remain.
+# Can be sourced with --test-poll to expose poll_sessions() for testing.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LIB_DIR="${SCRIPT_DIR}/../lib"
+CLAUDE_NOTIFIER_DIR="${HOME}/.config/claude-notifier"
+SESSIONS_DIR="${CLAUDE_NOTIFIER_DIR}/sessions"
+DAEMON_PID_FILE="${CLAUDE_NOTIFIER_DIR}/.daemon.pid"
+POLL_INTERVAL=10
+EMPTY_POLLS=0
+MAX_EMPTY_POLLS=30  # 30 * 10s = 5 min before auto-stop
+
+# Only source libraries if not already loaded (test env may pre-source)
+if ! type load_config &>/dev/null; then
+  source "${LIB_DIR}/config.sh"
+fi
+if ! type kitty_set_tab_color_by_id &>/dev/null; then
+  source "${LIB_DIR}/kitty.sh"
+fi
+if ! type is_stuck_command &>/dev/null; then
+  source "${LIB_DIR}/stuck.sh"
+fi
+
+_sed_inplace() {
+  # Portable sed -i: try macOS syntax first, fall back to GNU
+  if sed -i '' "$@" 2>/dev/null; then
+    return 0
+  else
+    sed -i "$@" 2>/dev/null
+    return $?
+  fi
+}
+
+poll_sessions() {
+  load_config
+  local now
+  now=$(date +%s)
+  local found_sessions=false
+
+  for state_file in "${SESSIONS_DIR}"/*.state; do
+    [[ -f "$state_file" ]] || continue
+    found_sessions=true
+
+    # Read state file fields
+    local state="" timestamp="" kitty_window_id="" command="" tool_use_id="" alerted=""
+    while IFS='=' read -r key value; do
+      case "$key" in
+        state) state="$value" ;;
+        timestamp) timestamp="$value" ;;
+        kitty_window_id) kitty_window_id="$value" ;;
+        command) command="$value" ;;
+        tool_use_id) tool_use_id="$value" ;;
+        alerted) alerted="$value" ;;
+      esac
+    done < "$state_file"
+
+    [[ -z "$timestamp" ]] && continue
+    local elapsed=$(( now - timestamp ))
+
+    # Dead session cleanup (1 hour)
+    if [[ $elapsed -gt 3600 ]]; then
+      rm -f "$state_file"
+      continue
+    fi
+
+    # Idle transition: done|waiting -> idle after IDLE_TIMEOUT
+    local idle_timeout="${IDLE_TIMEOUT:-300}"
+    idle_timeout="${idle_timeout%%.*}"
+    if [[ "$state" == "done" || "$state" == "waiting" ]] && [[ $elapsed -gt $idle_timeout ]]; then
+      if [[ -n "$kitty_window_id" ]]; then
+        # Blink reminder (1 slow pulse)
+        local blink_slow="${BLINK_SLOW:-0.3}"
+        kitty_set_tab_color_by_id "$kitty_window_id" active_bg="#ffffff"
+        sleep "$blink_slow"
+        kitty_set_tab_color_by_id "$kitty_window_id" active_bg=NONE
+        # Set idle title and clear color
+        kitty_set_tab_title_by_id "$kitty_window_id" "Idle"
+        kitty_set_tab_color_by_id "$kitty_window_id" active_bg=NONE
+      fi
+      # Update state file to idle
+      _sed_inplace "s/^state=.*/state=idle/" "$state_file"
+      continue
+    fi
+
+    # Stuck detection: working state with a watched command
+    local stuck_timeout="${STUCK_TIMEOUT:-180}"
+    stuck_timeout="${stuck_timeout%%.*}"
+    local stuck_commands="${STUCK_COMMANDS:-install|init|create-|run dev|run start|serve}"
+    if [[ "$state" == "working" && -n "$command" ]] && \
+       [[ $elapsed -gt $stuck_timeout ]] && \
+       is_stuck_command "$command" "$stuck_commands"; then
+
+      local keyword
+      keyword=$(extract_command_keyword "$command")
+      local elapsed_fmt
+      elapsed_fmt=$(format_elapsed "$elapsed")
+
+      # Update title with elapsed time
+      if [[ -n "$kitty_window_id" ]]; then
+        kitty_set_tab_title_by_id "$kitty_window_id" "${keyword} ${elapsed_fmt}"
+      fi
+
+      # Send desktop notification (once)
+      if [[ "$alerted" != "true" ]]; then
+        kitten notify --title "Claude Code" "${keyword} has been running for ${elapsed_fmt}" 2>/dev/null || true
+        _sed_inplace "s/^alerted=.*/alerted=true/" "$state_file"
+      fi
+    fi
+  done
+
+  # Auto-stop tracking
+  if [[ "$found_sessions" == "false" ]]; then
+    ((EMPTY_POLLS++)) || true
+  else
+    EMPTY_POLLS=0
+  fi
+}
+
+# -- Test mode: expose poll_sessions for testing --
+if [[ "${1:-}" == "--test-poll" ]]; then
+  poll_sessions
+  return 0 2>/dev/null || exit 0
+fi
+
+# -- Main daemon loop --
+cleanup_daemon() {
+  rm -f "$DAEMON_PID_FILE"
+  exit 0
+}
+trap cleanup_daemon SIGTERM SIGINT
+
+echo $$ > "$DAEMON_PID_FILE"
+
+while true; do
+  poll_sessions
+
+  if [[ $EMPTY_POLLS -ge $MAX_EMPTY_POLLS ]]; then
+    rm -f "$DAEMON_PID_FILE"
+    exit 0
+  fi
+
+  sleep "$POLL_INTERVAL"
+done

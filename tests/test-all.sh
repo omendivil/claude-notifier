@@ -301,6 +301,80 @@ for new_state in researching error waiting; do
   fi
 done
 
+# ── Test 16: Daemon idle transition ───────────
+echo "Test 16: Daemon transitions done -> idle after timeout"
+export KITTY_WINDOW_ID="12345"
+SESSIONS_DIR="${TMPDIR_TEST}/.config/claude-notifier/sessions"
+mkdir -p "$SESSIONS_DIR"
+> "$MOCK_LOG"
+# Write a state file with old timestamp (simulate 10 minutes ago)
+old_ts=$(( $(date +%s) - 600 ))
+cat > "${SESSIONS_DIR}/daemon-test-1.state" << EOF
+state=done
+timestamp=${old_ts}
+kitty_window_id=12345
+command=
+tool_use_id=
+alerted=false
+EOF
+# Run one daemon cycle with short timeout
+IDLE_TIMEOUT=2
+STUCK_TIMEOUT=999
+STUCK_COMMANDS="install"
+source "${PROJECT_DIR}/lib/config.sh"
+source "${PROJECT_DIR}/lib/kitty.sh"
+source "${PROJECT_DIR}/lib/stuck.sh"
+source "${PROJECT_DIR}/bin/claude-notifier-daemon" --test-poll
+sleep 1
+# Check state file was updated to idle
+if grep -q "state=idle" "${SESSIONS_DIR}/daemon-test-1.state" 2>/dev/null; then
+  echo "  PASS: state transitioned to idle"
+  ((PASS++)) || true
+else
+  echo "  FAIL: state not transitioned to idle"
+  ((FAIL++)) || true
+fi
+if grep -q "set-tab-title" "$MOCK_LOG" 2>/dev/null; then
+  echo "  PASS: tab title was updated"
+  ((PASS++)) || true
+else
+  echo "  FAIL: tab title not updated"
+  ((FAIL++)) || true
+fi
+rm -f "${SESSIONS_DIR}/daemon-test-1.state"
+
+# ── Test 17: Daemon stuck detection ───────────
+echo "Test 17: Daemon detects stuck command"
+> "$MOCK_LOG"
+old_ts=$(( $(date +%s) - 300 ))
+cat > "${SESSIONS_DIR}/daemon-test-2.state" << EOF
+state=working
+timestamp=${old_ts}
+kitty_window_id=12345
+command=npm install react
+tool_use_id=toolu_abc
+alerted=false
+EOF
+IDLE_TIMEOUT=999
+STUCK_TIMEOUT=2
+source "${PROJECT_DIR}/bin/claude-notifier-daemon" --test-poll
+sleep 0.5
+if grep -q "set-tab-title.*npm" "$MOCK_LOG" 2>/dev/null; then
+  echo "  PASS: stuck title updated"
+  ((PASS++)) || true
+else
+  echo "  FAIL: stuck title not updated"
+  ((FAIL++)) || true
+fi
+if grep -q "alerted=true" "${SESSIONS_DIR}/daemon-test-2.state" 2>/dev/null; then
+  echo "  PASS: alerted flag set"
+  ((PASS++)) || true
+else
+  echo "  FAIL: alerted flag not set"
+  ((FAIL++)) || true
+fi
+rm -f "${SESSIONS_DIR}/daemon-test-2.state"
+
 # ── Cleanup ──────────────────────────────────────
 rm -rf "$TMPDIR_TEST"
 
