@@ -77,7 +77,7 @@ ensure_daemon() {
   fi
 
   # We got the lock — check if daemon is running
-  trap 'rmdir "$DAEMON_LOCK_DIR" 2>/dev/null' RETURN
+  trap 'rmdir "$DAEMON_LOCK_DIR" 2>/dev/null || true' RETURN
 
   if [[ -f "$DAEMON_PID_FILE" ]]; then
     local daemon_pid

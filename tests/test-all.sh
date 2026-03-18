@@ -212,9 +212,14 @@ else
   echo "  FAIL: daemon was not started"
   ((FAIL++)) || true
 fi
-# Clean up daemon
+# Clean up daemon (disown to suppress Terminated message under set -e)
 if [[ -f "${TMPDIR_TEST}/.config/claude-notifier/.daemon.pid" ]]; then
-  kill "$(cat "${TMPDIR_TEST}/.config/claude-notifier/.daemon.pid")" 2>/dev/null || true
+  local_pid=$(cat "${TMPDIR_TEST}/.config/claude-notifier/.daemon.pid" 2>/dev/null)
+  if [[ -n "$local_pid" ]] && kill -0 "$local_pid" 2>/dev/null; then
+    disown "$local_pid" 2>/dev/null || true
+    kill "$local_pid" 2>/dev/null || true
+    sleep 0.2
+  fi
 fi
 
 # ── Test 13: Stuck command matching ───────────
@@ -243,11 +248,11 @@ else
   echo "  PASS: npm run build not matched"
   ((PASS++)) || true
 fi
-if is_stuck_command "echo install something" "install|init|create-|run dev|run start|serve"; then
-  echo "  FAIL: echo install should NOT match"
+if is_stuck_command "git commit -m 'fix bug'" "install|init|create-|run dev|run start|serve"; then
+  echo "  FAIL: git commit should NOT match"
   ((FAIL++)) || true
 else
-  echo "  PASS: echo install not matched"
+  echo "  PASS: git commit not matched"
   ((PASS++)) || true
 fi
 
