@@ -11,13 +11,19 @@ set_state_color() {
     permission)
       kitty_set_tab_color active_bg="${COLOR_PERMISSION:-#ff003c}"
       ;;
-    done|idle)
+    done|waiting)
       kitty_set_tab_color active_bg="${COLOR_DONE:-#00ffd5}"
       ;;
     working)
       kitty_set_tab_color active_bg="${COLOR_WORKING:-#b026ff}"
       ;;
-    normal)
+    researching)
+      kitty_set_tab_color active_bg="${COLOR_RESEARCHING:-#007aff}"
+      ;;
+    error)
+      kitty_set_tab_color active_bg="${COLOR_ERROR:-#ff6b00}"
+      ;;
+    normal|idle)
       kitty_set_tab_color active_bg=NONE
       ;;
   esac
