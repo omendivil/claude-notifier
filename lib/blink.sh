@@ -24,6 +24,7 @@ _do_blink() {
 
   case "$state" in
     permission)
+      # 3 fast blinks — urgent
       for _ in 1 2 3; do
         kitty_set_tab_color active_bg="#ffffff"
         sleep "$fast"
@@ -31,7 +32,17 @@ _do_blink() {
         sleep "$fast"
       done
       ;;
-    done|idle)
+    error)
+      # 2 fast blinks — attention needed
+      for _ in 1 2; do
+        kitty_set_tab_color active_bg="#ffffff"
+        sleep "$fast"
+        kitty_set_tab_color active_bg=NONE
+        sleep "$fast"
+      done
+      ;;
+    done)
+      # 2 slow pulses — gentle
       for _ in 1 2; do
         kitty_set_tab_color active_bg="#ffffff"
         sleep "$slow"
@@ -39,10 +50,20 @@ _do_blink() {
         sleep "$slow"
       done
       ;;
-    working)
+    idle)
+      # 1 slow pulse — reminder
+      kitty_set_tab_color active_bg="#ffffff"
+      sleep "$slow"
+      kitty_set_tab_color active_bg=NONE
+      ;;
+    working|researching)
+      # 1 short flash — acknowledgment
       kitty_set_tab_color active_bg="#ffffff"
       sleep 0.15
       kitty_set_tab_color active_bg=NONE
+      ;;
+    waiting|normal)
+      # No blink
       ;;
   esac
 
