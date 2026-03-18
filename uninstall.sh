@@ -58,6 +58,18 @@ else
   warn "settings.json not found — skipping hook removal"
 fi
 
+# Step 1.5: Kill daemon if running
+if [[ -f "${INSTALL_DIR}/.daemon.pid" ]]; then
+  info "Stopping daemon..."
+  daemon_pid=$(cat "${INSTALL_DIR}/.daemon.pid" 2>/dev/null)
+  if [[ -n "$daemon_pid" ]] && kill -0 "$daemon_pid" 2>/dev/null; then
+    kill "$daemon_pid" 2>/dev/null || true
+    ok "Daemon stopped"
+  fi
+  rm -f "${INSTALL_DIR}/.daemon.pid"
+fi
+rm -rf "${INSTALL_DIR}/.daemon.lock"
+
 # Step 2: Remove installed files
 if [[ -d "$INSTALL_DIR" ]]; then
   info "Removing installed files..."
@@ -67,8 +79,9 @@ if [[ -d "$INSTALL_DIR" ]]; then
       rm -rf "$INSTALL_DIR"
       ok "Removed ${INSTALL_DIR} (including config)"
     else
-      rm -rf "${INSTALL_DIR}/bin" "${INSTALL_DIR}/lib"
-      rm -f "${INSTALL_DIR}/.blink.pid" "${INSTALL_DIR}/.last-working-notify"
+      rm -rf "${INSTALL_DIR}/bin" "${INSTALL_DIR}/lib" "${INSTALL_DIR}/sessions"
+      rm -f "${INSTALL_DIR}/.blink.pid" "${INSTALL_DIR}/.last-working-notify" "${INSTALL_DIR}/.daemon.pid"
+      rm -rf "${INSTALL_DIR}/.daemon.lock"
       ok "Removed ${INSTALL_DIR} (config.conf preserved)"
     fi
   else

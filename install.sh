@@ -47,8 +47,11 @@ ok "All dependencies found"
 info "Installing to ${INSTALL_DIR}..."
 mkdir -p "${INSTALL_DIR}/bin" "${INSTALL_DIR}/lib"
 cp "${SCRIPT_DIR}/bin/claude-notifier" "${INSTALL_DIR}/bin/"
+cp "${SCRIPT_DIR}/bin/claude-notifier-daemon" "${INSTALL_DIR}/bin/"
 cp "${SCRIPT_DIR}/lib/"*.sh "${INSTALL_DIR}/lib/"
 chmod +x "${INSTALL_DIR}/bin/claude-notifier"
+chmod +x "${INSTALL_DIR}/bin/claude-notifier-daemon"
+mkdir -p "${INSTALL_DIR}/sessions"
 if [[ ! -f "${INSTALL_DIR}/config.conf" ]]; then
   cp "${SCRIPT_DIR}/config/default.conf" "${INSTALL_DIR}/config.conf"
   ok "Config created at ${INSTALL_DIR}/config.conf"
@@ -61,15 +64,33 @@ info "Configuring Claude Code hooks..."
 NOTIFIER_CMD="${INSTALL_DIR}/bin/claude-notifier"
 
 HOOKS_JSON=$(jq -n --arg cmd "$NOTIFIER_CMD" '{
+  UserPromptSubmit: [
+    {hooks: [{type: "command", command: ($cmd + " --state working --stdin")}]}
+  ],
   Notification: [
-    {matcher: "permission_prompt", hooks: [{type: "command", command: ($cmd + " --state permission")}]},
-    {matcher: "idle_prompt", hooks: [{type: "command", command: ($cmd + " --state idle")}]}
+    {matcher: "permission_prompt", hooks: [{type: "command", command: ($cmd + " --state permission --stdin")}]},
+    {matcher: "idle_prompt", hooks: [{type: "command", command: ($cmd + " --state waiting --stdin")}]}
   ],
   Stop: [
-    {hooks: [{type: "command", command: ($cmd + " --state done")}]}
+    {hooks: [{type: "command", command: ($cmd + " --state done --stdin")}]}
   ],
   PreToolUse: [
-    {matcher: ".*", hooks: [{type: "command", command: ($cmd + " --state working")}]}
+    {matcher: ".*", hooks: [{type: "command", command: ($cmd + " --state working --stdin")}]}
+  ],
+  PostToolUse: [
+    {matcher: ".*", hooks: [{type: "command", command: ($cmd + " --state working --stdin")}]}
+  ],
+  PostToolUseFailure: [
+    {matcher: ".*", hooks: [{type: "command", command: ($cmd + " --state error --stdin")}]}
+  ],
+  SubagentStart: [
+    {matcher: ".*", hooks: [{type: "command", command: ($cmd + " --state researching --stdin")}]}
+  ],
+  SubagentStop: [
+    {matcher: ".*", hooks: [{type: "command", command: ($cmd + " --state working --stdin")}]}
+  ],
+  SessionEnd: [
+    {hooks: [{type: "command", command: ($cmd + " --cleanup --stdin")}]}
   ]
 }')
 
@@ -87,9 +108,15 @@ else
   MERGED=$(jq --argjson new_hooks "$HOOKS_JSON" '
     .hooks = (
       (.hooks // {}) |
+      .UserPromptSubmit = ((.UserPromptSubmit // []) + $new_hooks.UserPromptSubmit) |
       .Notification = ((.Notification // []) + $new_hooks.Notification) |
       .Stop = ((.Stop // []) + $new_hooks.Stop) |
-      .PreToolUse = ((.PreToolUse // []) + $new_hooks.PreToolUse)
+      .PreToolUse = ((.PreToolUse // []) + $new_hooks.PreToolUse) |
+      .PostToolUse = ((.PostToolUse // []) + $new_hooks.PostToolUse) |
+      .PostToolUseFailure = ((.PostToolUseFailure // []) + $new_hooks.PostToolUseFailure) |
+      .SubagentStart = ((.SubagentStart // []) + $new_hooks.SubagentStart) |
+      .SubagentStop = ((.SubagentStop // []) + $new_hooks.SubagentStop) |
+      .SessionEnd = ((.SessionEnd // []) + $new_hooks.SessionEnd)
     )
   ' "$SETTINGS_FILE")
   echo "$MERGED" > "$SETTINGS_FILE"
