@@ -375,6 +375,50 @@ else
 fi
 rm -f "${SESSIONS_DIR}/daemon-test-2.state"
 
+# ── Test 18: Full state lifecycle ─────────────
+echo "Test 18: Full state lifecycle (working → permission → working → done → cleanup)"
+export KITTY_WINDOW_ID="12345"
+rm -f "${TMPDIR_TEST}/.config/claude-notifier/.last-working-notify"
+mkdir -p "${TMPDIR_TEST}/.config/claude-notifier/sessions"
+> "$MOCK_LOG"
+
+# Simulate: user submits prompt
+echo '{"session_id":"lifecycle-1"}' | "$NOTIFIER" --state working --stdin
+sleep 0.3
+
+# Simulate: permission needed
+echo '{"session_id":"lifecycle-1","message":"Claude needs permission to use Bash"}' | "$NOTIFIER" --state permission --stdin
+sleep 0.3
+
+# Simulate: tool approved and completed
+rm -f "${TMPDIR_TEST}/.config/claude-notifier/.last-working-notify"
+echo '{"session_id":"lifecycle-1","tool_name":"Bash"}' | "$NOTIFIER" --state working --stdin
+sleep 0.3
+
+# Simulate: Claude finishes
+echo '{"session_id":"lifecycle-1"}' | "$NOTIFIER" --state done --stdin
+sleep 0.3
+
+# Verify state file exists with done state
+if grep -q "state=done" "${TMPDIR_TEST}/.config/claude-notifier/sessions/lifecycle-1.state" 2>/dev/null; then
+  echo "  PASS: lifecycle ended in done state"
+  ((PASS++)) || true
+else
+  echo "  FAIL: lifecycle did not end in done state"
+  ((FAIL++)) || true
+fi
+
+# Simulate: cleanup
+echo '{"session_id":"lifecycle-1"}' | "$NOTIFIER" --cleanup --stdin
+
+if [[ ! -f "${TMPDIR_TEST}/.config/claude-notifier/sessions/lifecycle-1.state" ]]; then
+  echo "  PASS: state file cleaned up"
+  ((PASS++)) || true
+else
+  echo "  FAIL: state file not cleaned up"
+  ((FAIL++)) || true
+fi
+
 # ── Cleanup ──────────────────────────────────────
 rm -rf "$TMPDIR_TEST"
 
