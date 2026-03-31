@@ -2,6 +2,7 @@
 # Tab blink logic with PID tracking and cancellation
 
 BLINK_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/kitty.sh
 source "${BLINK_SCRIPT_DIR}/kitty.sh"
 
 BLINK_PID_FILE="${HOME}/.config/claude-notifier/.blink.pid"

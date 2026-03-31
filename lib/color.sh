@@ -2,6 +2,7 @@
 # Persistent tab color logic
 
 COLOR_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/kitty.sh
 source "${COLOR_SCRIPT_DIR}/kitty.sh"
 
 set_state_color() {

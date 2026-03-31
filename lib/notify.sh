@@ -2,6 +2,7 @@
 # Desktop notification via kitten notify
 
 NOTIFY_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/kitty.sh
 source "${NOTIFY_SCRIPT_DIR}/kitty.sh"
 
 _extract_message() {
