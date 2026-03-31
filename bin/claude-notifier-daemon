@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# shellcheck disable=SC1091  # dynamic source paths resolved at runtime
+# shellcheck disable=SC1091,SC2034,SC2317  # SC1091: dynamic source paths; SC2034: tool_use_id read for completeness; SC2317: cleanup_daemon called via trap
 # Claude Notifier Daemon v2.1.0
 # Single background process that monitors all session state files
 # for time-based transitions (done/waiting -> idle) and stuck command detection.
@@ -50,7 +50,6 @@ poll_sessions() {
     found_sessions=true
 
     # Read state file fields
-    # shellcheck disable=SC2034  # tool_use_id read for completeness, used by other consumers
     local state="" timestamp="" kitty_window_id="" command="" tool_use_id="" alerted=""
     while IFS='=' read -r key value; do
       case "$key" in
@@ -132,7 +131,6 @@ if [[ "${1:-}" == "--test-poll" ]]; then
 fi
 
 # -- Main daemon loop --
-# shellcheck disable=SC2317  # cleanup_daemon is called via trap, not directly
 cleanup_daemon() {
   rm -f "$DAEMON_PID_FILE"
   exit 0
