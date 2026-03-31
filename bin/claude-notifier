@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC1091  # dynamic source paths resolved at runtime
 # Claude Notifier v2.1.0 — main dispatcher
 # Called by Claude Code hooks to signal state changes to Kitty tabs
 #
