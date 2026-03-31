@@ -5,6 +5,7 @@ on:
     branches: [main]
   push:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   test:
@@ -18,4 +19,4 @@ jobs:
       - name: Shellcheck
         run: |
           brew install shellcheck
-          shellcheck bin/claude-notifier lib/*.sh
+          shellcheck -x bin/claude-notifier bin/claude-notifier-daemon lib/*.sh install.sh uninstall.sh
