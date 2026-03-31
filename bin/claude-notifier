@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Claude Notifier v2.0.0 — main dispatcher
+# Claude Notifier v2.1.0 — main dispatcher
 # Called by Claude Code hooks to signal state changes to Kitty tabs
 #
 # Usage: claude-notifier --state <state> [--stdin]
@@ -39,7 +39,7 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     --version)
-      echo "claude-notifier 2.0.0"
+      echo "claude-notifier 2.1.0"
       exit 0
       ;;
     --help|-h)

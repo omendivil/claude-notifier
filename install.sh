@@ -65,32 +65,35 @@ NOTIFIER_CMD="${INSTALL_DIR}/bin/claude-notifier"
 
 HOOKS_JSON=$(jq -n --arg cmd "$NOTIFIER_CMD" '{
   UserPromptSubmit: [
-    {hooks: [{type: "command", command: ($cmd + " --state working --stdin")}]}
+    {hooks: [{type: "command", command: ($cmd + " --state working --stdin"), async: true}]}
   ],
   Notification: [
-    {matcher: "permission_prompt", hooks: [{type: "command", command: ($cmd + " --state permission --stdin")}]},
-    {matcher: "idle_prompt", hooks: [{type: "command", command: ($cmd + " --state waiting --stdin")}]}
+    {matcher: "permission_prompt", hooks: [{type: "command", command: ($cmd + " --state permission --stdin"), async: true}]},
+    {matcher: "idle_prompt", hooks: [{type: "command", command: ($cmd + " --state waiting --stdin"), async: true}]}
   ],
   Stop: [
-    {hooks: [{type: "command", command: ($cmd + " --state done --stdin")}]}
+    {hooks: [{type: "command", command: ($cmd + " --state done --stdin"), async: true}]}
+  ],
+  StopFailure: [
+    {hooks: [{type: "command", command: ($cmd + " --state error --stdin"), async: true}]}
   ],
   PreToolUse: [
-    {matcher: ".*", hooks: [{type: "command", command: ($cmd + " --state working --stdin")}]}
+    {matcher: ".*", hooks: [{type: "command", command: ($cmd + " --state working --stdin"), async: true}]}
   ],
   PostToolUse: [
-    {matcher: ".*", hooks: [{type: "command", command: ($cmd + " --state working --stdin")}]}
+    {matcher: ".*", hooks: [{type: "command", command: ($cmd + " --state working --stdin"), async: true}]}
   ],
   PostToolUseFailure: [
-    {matcher: ".*", hooks: [{type: "command", command: ($cmd + " --state error --stdin")}]}
+    {matcher: ".*", hooks: [{type: "command", command: ($cmd + " --state error --stdin"), async: true}]}
   ],
   SubagentStart: [
-    {matcher: ".*", hooks: [{type: "command", command: ($cmd + " --state researching --stdin")}]}
+    {matcher: ".*", hooks: [{type: "command", command: ($cmd + " --state researching --stdin"), async: true}]}
   ],
   SubagentStop: [
-    {matcher: ".*", hooks: [{type: "command", command: ($cmd + " --state working --stdin")}]}
+    {matcher: ".*", hooks: [{type: "command", command: ($cmd + " --state working --stdin"), async: true}]}
   ],
   SessionEnd: [
-    {hooks: [{type: "command", command: ($cmd + " --cleanup --stdin")}]}
+    {hooks: [{type: "command", command: ($cmd + " --cleanup --stdin"), async: true}]}
   ]
 }')
 
@@ -111,6 +114,7 @@ else
       .UserPromptSubmit = ((.UserPromptSubmit // []) + $new_hooks.UserPromptSubmit) |
       .Notification = ((.Notification // []) + $new_hooks.Notification) |
       .Stop = ((.Stop // []) + $new_hooks.Stop) |
+      .StopFailure = ((.StopFailure // []) + $new_hooks.StopFailure) |
       .PreToolUse = ((.PreToolUse // []) + $new_hooks.PreToolUse) |
       .PostToolUse = ((.PostToolUse // []) + $new_hooks.PostToolUse) |
       .PostToolUseFailure = ((.PostToolUseFailure // []) + $new_hooks.PostToolUseFailure) |

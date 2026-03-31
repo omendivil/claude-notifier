@@ -132,7 +132,7 @@ assert_not_contains "no notify call for working" "notify.*Claude" "$MOCK_LOG"
 # ── Test 8: Version flag ─────────────────────────
 echo "Test 8: --version flag"
 version_output=$("$NOTIFIER" --version)
-if [[ "$version_output" == "claude-notifier 2.0.0" ]]; then
+if [[ "$version_output" == "claude-notifier 2.1.0" ]]; then
   echo "  PASS: version output correct"
   ((PASS++)) || true
 else
