@@ -31,7 +31,7 @@ Mix and match — enable any combination:
 ## Install
 
 ```bash
-git clone https://github.com/<your-username>/claude-notifier.git
+git clone https://github.com/omendivil/claude-notifier.git
 cd claude-notifier
 ./install.sh
 ```

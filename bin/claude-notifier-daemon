@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Claude Notifier Daemon v2.0.0
+# Claude Notifier Daemon v2.1.0
 # Single background process that monitors all session state files
 # for time-based transitions (done/waiting -> idle) and stuck command detection.
 #
