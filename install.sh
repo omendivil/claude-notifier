@@ -137,9 +137,7 @@ if [[ -f "$KITTY_CONF" ]]; then
       echo "  Claude Notifier needs remote control enabled."
       read -rp "  Add 'allow_remote_control yes' to kitty.conf? [y/N] " answer
       if [[ "$answer" =~ ^[Yy]$ ]]; then
-        echo "" >> "$KITTY_CONF"
-        echo "# Added by Claude Notifier" >> "$KITTY_CONF"
-        echo "allow_remote_control yes" >> "$KITTY_CONF"
+        { echo ""; echo "# Added by Claude Notifier"; echo "allow_remote_control yes"; } >> "$KITTY_CONF"
         ok "Added allow_remote_control to kitty.conf (restart Kitty to apply)"
       else
         warn "Skipped. Add 'allow_remote_control yes' to kitty.conf manually."
@@ -151,9 +149,7 @@ if [[ -f "$KITTY_CONF" ]]; then
     warn "allow_remote_control not found in kitty.conf"
     read -rp "  Add 'allow_remote_control yes' to kitty.conf? [y/N] " answer
     if [[ "$answer" =~ ^[Yy]$ ]]; then
-      echo "" >> "$KITTY_CONF"
-      echo "# Added by Claude Notifier" >> "$KITTY_CONF"
-      echo "allow_remote_control yes" >> "$KITTY_CONF"
+      { echo ""; echo "# Added by Claude Notifier"; echo "allow_remote_control yes"; } >> "$KITTY_CONF"
       ok "Added allow_remote_control to kitty.conf (restart Kitty to apply)"
     else
       warn "Skipped. Add 'allow_remote_control yes' to kitty.conf manually."

@@ -6,6 +6,7 @@ INSTALL_DIR="${HOME}/.config/claude-notifier"
 SETTINGS_FILE="${HOME}/.claude/settings.json"
 BACKUP_FILE="${SETTINGS_FILE}.backup-claude-notifier"
 
+# shellcheck disable=SC2034  # RED used by err() if added later
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
@@ -79,7 +80,7 @@ if [[ -d "$INSTALL_DIR" ]]; then
       rm -rf "$INSTALL_DIR"
       ok "Removed ${INSTALL_DIR} (including config)"
     else
-      rm -rf "${INSTALL_DIR}/bin" "${INSTALL_DIR}/lib" "${INSTALL_DIR}/sessions"
+      rm -rf "${INSTALL_DIR:?}/bin" "${INSTALL_DIR:?}/lib" "${INSTALL_DIR:?}/sessions"
       rm -f "${INSTALL_DIR}/.blink.pid" "${INSTALL_DIR}/.last-working-notify" "${INSTALL_DIR}/.daemon.pid"
       rm -rf "${INSTALL_DIR}/.daemon.lock"
       ok "Removed ${INSTALL_DIR} (config.conf preserved)"
