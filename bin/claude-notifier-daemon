@@ -50,6 +50,7 @@ poll_sessions() {
     found_sessions=true
 
     # Read state file fields
+    # shellcheck disable=SC2034  # tool_use_id read for completeness, used by other consumers
     local state="" timestamp="" kitty_window_id="" command="" tool_use_id="" alerted=""
     while IFS='=' read -r key value; do
       case "$key" in
@@ -57,7 +58,7 @@ poll_sessions() {
         timestamp) timestamp="$value" ;;
         kitty_window_id) kitty_window_id="$value" ;;
         command) command="$value" ;;
-        tool_use_id) tool_use_id="$value" ;;  # shellcheck disable=SC2034 — read for completeness
+        tool_use_id) tool_use_id="$value" ;;
         alerted) alerted="$value" ;;
       esac
     done < "$state_file"
