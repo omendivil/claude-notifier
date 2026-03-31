@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2034  # globals consumed by other files after sourcing
 # Config loader with validation for claude-notifier
 # Reads ~/.config/claude-notifier/config.conf with safe parsing (no eval/source)
 

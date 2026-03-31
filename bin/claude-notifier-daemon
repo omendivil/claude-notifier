@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC1091,SC2034,SC2317  # SC1091: dynamic source paths; SC2034: tool_use_id read for completeness; SC2317: cleanup_daemon called via trap
 # Claude Notifier Daemon v2.1.0
 # Single background process that monitors all session state files
 # for time-based transitions (done/waiting -> idle) and stuck command detection.
