@@ -77,20 +77,8 @@ HOOKS_JSON=$(jq -n --arg cmd "$NOTIFIER_CMD" '{
   StopFailure: [
     {hooks: [{type: "command", command: ($cmd + " --state error --stdin"), async: true}]}
   ],
-  PreToolUse: [
-    {matcher: ".*", hooks: [{type: "command", command: ($cmd + " --state working --stdin"), async: true}]}
-  ],
-  PostToolUse: [
-    {matcher: ".*", hooks: [{type: "command", command: ($cmd + " --state working --stdin"), async: true}]}
-  ],
   PostToolUseFailure: [
     {matcher: ".*", hooks: [{type: "command", command: ($cmd + " --state error --stdin"), async: true}]}
-  ],
-  SubagentStart: [
-    {matcher: ".*", hooks: [{type: "command", command: ($cmd + " --state researching --stdin"), async: true}]}
-  ],
-  SubagentStop: [
-    {matcher: ".*", hooks: [{type: "command", command: ($cmd + " --state working --stdin"), async: true}]}
   ],
   SessionEnd: [
     {hooks: [{type: "command", command: ($cmd + " --cleanup --stdin"), async: true}]}
@@ -115,11 +103,7 @@ else
       .Notification = ((.Notification // []) + $new_hooks.Notification) |
       .Stop = ((.Stop // []) + $new_hooks.Stop) |
       .StopFailure = ((.StopFailure // []) + $new_hooks.StopFailure) |
-      .PreToolUse = ((.PreToolUse // []) + $new_hooks.PreToolUse) |
-      .PostToolUse = ((.PostToolUse // []) + $new_hooks.PostToolUse) |
       .PostToolUseFailure = ((.PostToolUseFailure // []) + $new_hooks.PostToolUseFailure) |
-      .SubagentStart = ((.SubagentStart // []) + $new_hooks.SubagentStart) |
-      .SubagentStop = ((.SubagentStop // []) + $new_hooks.SubagentStop) |
       .SessionEnd = ((.SessionEnd // []) + $new_hooks.SessionEnd)
     )
   ' "$SETTINGS_FILE")
