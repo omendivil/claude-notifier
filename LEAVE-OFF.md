@@ -1,23 +1,22 @@
 ---
-captured: 2026-05-07 11:00 MST
+captured: 2026-05-07 13:05 MST
 domain: claude-notifier
-purpose: Session handoff after the v2.2.0 ship and project-conventions update
+purpose: Session handoff after v2.2.0 ship, project-conventions update, and live install activation
 ---
 
 # claude-notifier — LEAVE-OFF
 
 ## State
 
-- **Branch:** `docs/agents-md-spec-and-leave-off` (uncommitted, not yet pushed)
-- **Main HEAD:** `53a23d0` (PR #6 merged — v2.2.0 with per-session debounce + elicitation matchers)
-- **Uncommitted on this branch:**
-  - Modified: `.gitignore` (removed `agent-log.md` line — file moved)
-  - Modified: `CLAUDE.md` (full agents.md spec restructure)
-  - New: `AGENTS.md` (Codex twin)
-  - New: `docs/history/agent-log-2026-03-13.md` (moved from root, no longer gitignored)
-- **Hub partner created (uncommitted in hub repo):** `~/Dev/hub/claude-notifier/CLAUDE.md`
-
-The user has not yet run `./uninstall.sh && ./install.sh` to activate the v2.2.0 elicitation hook entries in `~/.claude/settings.json`. The dispatcher binary changes (per-session debounce) are inert until the install copies them. **This is the only outstanding action before claude-notifier is fully active in v2.2.0 form.**
+- **Branch:** `main` (clean working tree)
+- **Main HEAD:** `d0c3ec7` (PR #7 merged — agents.md spec + AGENTS.md + LEAVE-OFF.md + hub partner)
+- **Previous merge:** `53a23d0` (PR #6 — v2.2.0 with per-session debounce + elicitation matchers)
+- **Live install:** v2.2.0 active. Verified 2026-05-07 13:00 MST:
+  - `~/.config/claude-notifier/bin/claude-notifier --version` → `claude-notifier 2.2.0`
+  - Per-session debounce path (`SESSION_ID:-shared`) present in live dispatcher
+  - All 4 Notification matchers in `~/.claude/settings.json`: `permission_prompt`, `idle_prompt`, `elicitation_dialog`, `elicitation_response`
+  - Test blink ran successfully during install
+- **Hub partner:** `~/Dev/hub/claude-notifier/CLAUDE.md` (committed to hub main, hub has no remote)
 
 ## Where we are
 
@@ -61,8 +60,6 @@ Two threads moved this session.
 
 ## Open / pending (carry forward)
 
-- **`pending-user-action:`** Run `./uninstall.sh && ./install.sh` from `~/Dev/claude-notifier/` to activate v2.2.0 hook entries in `~/.claude/settings.json`. Dispatcher binary upgrade ships transparently; only the new elicitation matchers need re-merge.
-- **`pending-commit:`** Branch `docs/agents-md-spec-and-leave-off` has uncommitted changes (CLAUDE.md, AGENTS.md, .gitignore, docs/history/agent-log-2026-03-13.md). Hub partner at `~/Dev/hub/claude-notifier/CLAUDE.md` also uncommitted. Plan: commit + PR after this leave-off is written.
 - **`external-waiting:`** Codex CLI bump 0.128 → 0.129. Run `brew upgrade codex` again in a few days; brew formula will catch up.
 - **`deferred:`** Codex-notifier mode (visual tab indicators driven by Codex CLI hooks). Codex has full hook parity (same event names: SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, Stop, plus PermissionRequest). ~80% reuse of existing dispatcher. User explicitly deferred this in 2026-05-07 session ("skip notifications track right now").
 - **`deferred:`** Yes/No conversational question state (Bug 1 from `project_session_notes_2026_03_18`). Possibly partially addressed by the new elicitation matchers, but conversational questions vs MCP elicitations are different surfaces. Verify after install.
@@ -72,11 +69,11 @@ Two threads moved this session.
 ## Next session: start here
 
 1. Run `date '+%Y-%m-%d %H:%M %Z'` to anchor time.
-2. `cd ~/Dev/claude-notifier && git status` — confirm whether the docs branch was committed/PR'd or still pending.
-3. Confirm with the user whether `./uninstall.sh && ./install.sh` was run since last session. If yes, update this leave-off's "pending-user-action" → "done." If no, prompt them to run it before any new feature work.
-4. Verify the install took: `grep -c claude-notifier ~/.claude/settings.json` should show many matches; `grep elicitation_dialog ~/.claude/settings.json` should show the new matcher.
-5. If user wants to keep working on claude-notifier itself, the next priorities (in order) are: yes/no question state research → last-tab targeting bug → auto-switch mode (the three bugs from `project_session_notes_2026_03_18` that haven't been touched since March).
-6. If user wants to start codex-notifier, see `project_audit_2026_05_07.md` memory for the design sketch (deferred per 2026-05-07 decision).
+2. `cd ~/Dev/claude-notifier && git status` — should be clean on `main`.
+3. Quick sanity check that v2.2.0 is still active: `~/.config/claude-notifier/bin/claude-notifier --version` → expect `claude-notifier 2.2.0`. If it doesn't, an upgrade or rogue install elsewhere may have overwritten it.
+4. If user wants to keep working on claude-notifier itself, the next priorities (in order) are: yes/no question state research → last-tab targeting bug → auto-switch mode (the three bugs from `project_session_notes_2026_03_18` that haven't been touched since March).
+5. If user wants to start codex-notifier, see `project_audit_2026_05_07.md` memory for the design sketch (deferred per 2026-05-07 decision).
+6. If user has been using v2.2.0 for a while: ask whether the "running a lot causing issues" feeling has improved. If yes, the per-session debounce was the culprit. If no, dig into the daemon polling cost or hook fan-out further.
 
 ## Files / paths that matter
 
@@ -110,4 +107,6 @@ Two threads moved this session.
 ## Commits this session
 
 - `4d4c272..53a23d0` on main — PR #6 squashed merge (v2.2.0)
-- `docs/agents-md-spec-and-leave-off` branch — pending commit (this leave-off + the convention updates above)
+- `53a23d0..d0c3ec7` on main — PR #7 squashed merge (agents.md spec + AGENTS.md + LEAVE-OFF.md + hub partner)
+- `~/Dev/hub` `506c7bf` — created `claude-notifier/` partner directory (direct to hub main, no remote)
+- Live `~/.config/claude-notifier/` upgraded to v2.2.0 via `./uninstall.sh && ./install.sh` (2026-05-07 13:00 MST)
