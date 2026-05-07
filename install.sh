@@ -69,7 +69,9 @@ HOOKS_JSON=$(jq -n --arg cmd "$NOTIFIER_CMD" '{
   ],
   Notification: [
     {matcher: "permission_prompt", hooks: [{type: "command", command: ($cmd + " --state permission --stdin"), async: true}]},
-    {matcher: "idle_prompt", hooks: [{type: "command", command: ($cmd + " --state waiting --stdin"), async: true}]}
+    {matcher: "idle_prompt", hooks: [{type: "command", command: ($cmd + " --state waiting --stdin"), async: true}]},
+    {matcher: "elicitation_dialog", hooks: [{type: "command", command: ($cmd + " --state waiting --stdin"), async: true}]},
+    {matcher: "elicitation_response", hooks: [{type: "command", command: ($cmd + " --state working --stdin"), async: true}]}
   ],
   Stop: [
     {hooks: [{type: "command", command: ($cmd + " --state done --stdin"), async: true}]}

@@ -59,16 +59,16 @@ These are the valid states. Do not add, remove, or rename states without explici
 
 | State | Tab Title | Trigger |
 |-------|-----------|---------|
-| `permission` | ⛔ Perm | Notification hook (permission_prompt) |
+| `permission` | ⛔ Perm | Notification hook (`permission_prompt`) |
 | `done` | ✅ Done | Stop hook |
-| `waiting` | ⏳ Wait | Notification hook (idle_prompt) |
+| `waiting` | ⏳ Wait | Notification hook (`idle_prompt`, `elicitation_dialog`) |
 | `idle` | Idle | Daemon: done/waiting exceeds IDLE_TIMEOUT |
-| `working` | ⚡ Work | UserPromptSubmit, PreToolUse, PostToolUse, SubagentStop |
-| `researching` | 🔍 Research | SubagentStart |
+| `working` | ⚡ Work | UserPromptSubmit, Notification (`elicitation_response`) |
+| `researching` | 🔍 Research | _(no hook trigger — reserved; SubagentStart was removed in v2.1.x to reduce notification cascade)_ |
 | `error` | ❌ Error | PostToolUseFailure, StopFailure |
 | `normal` | (reset) | Explicit reset |
 
-Cleanup mode (`--cleanup --stdin`) resets tab title/color and removes the session state file.
+Cleanup mode (`--cleanup --stdin`) resets tab title/color and removes the session state file. Triggered automatically by the `SessionEnd` hook.
 
 ## Rules
 

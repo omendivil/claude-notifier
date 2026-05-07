@@ -86,7 +86,7 @@ assert_contains "calls set-tab-color" "set-tab-color" "$MOCK_LOG"
 # ── Test 3: Blink mode (working) ────────────────
 echo "Test 3: Blink mode — working state"
 # Reset debounce
-rm -f "${TMPDIR_TEST}/.config/claude-notifier/.last-working-notify"
+rm -f "${TMPDIR_TEST}/.config/claude-notifier/".last-working-notify*
 > "$MOCK_LOG"
 echo "" | "$NOTIFIER" --state working
 sleep 0.5
@@ -95,7 +95,7 @@ assert_contains "calls set-tab-color for working" "set-tab-color" "$MOCK_LOG"
 # ── Test 4: Debounce (working fires twice) ──────
 echo "Test 4: Debounce — second working call within 3s is skipped"
 # Refresh the debounce timestamp to "now" so the debounce window is still active
-date +%s > "${TMPDIR_TEST}/.config/claude-notifier/.last-working-notify"
+date +%s > "${TMPDIR_TEST}/.config/claude-notifier/.last-working-notify-shared"
 > "$MOCK_LOG"
 echo "" | "$NOTIFIER" --state working
 sleep 0.3
@@ -105,7 +105,7 @@ assert_not_contains "no kitten calls (debounced)" "set-tab-color" "$MOCK_LOG"
 echo "Test 5: Color mode — permission state"
 # Enable color mode in config
 sed -i '.bak' 's/NOTIFY_COLOR=false/NOTIFY_COLOR=true/' "${TMPDIR_TEST}/.config/claude-notifier/config.conf"
-rm -f "${TMPDIR_TEST}/.config/claude-notifier/.last-working-notify"
+rm -f "${TMPDIR_TEST}/.config/claude-notifier/".last-working-notify*
 > "$MOCK_LOG"
 echo "" | "$NOTIFIER" --state permission
 sleep 1.5
@@ -121,7 +121,7 @@ assert_contains "calls kitten notify" "notify" "$MOCK_LOG"
 
 # ── Test 7: Desktop notification skips working ───
 echo "Test 7: Desktop notification — working state does NOT notify"
-rm -f "${TMPDIR_TEST}/.config/claude-notifier/.last-working-notify"
+rm -f "${TMPDIR_TEST}/.config/claude-notifier/".last-working-notify*
 # Wait for any lingering blink subprocess from Test 6 to finish, then reset log
 sleep 0.2
 > "$MOCK_LOG"
@@ -132,7 +132,7 @@ assert_not_contains "no notify call for working" "notify.*Claude" "$MOCK_LOG"
 # ── Test 8: Version flag ─────────────────────────
 echo "Test 8: --version flag"
 version_output=$("$NOTIFIER" --version)
-if [[ "$version_output" == "claude-notifier 2.1.0" ]]; then
+if [[ "$version_output" == "claude-notifier 2.2.0" ]]; then
   echo "  PASS: version output correct"
   ((PASS++)) || true
 else
@@ -153,7 +153,7 @@ fi
 # ── Test 10: No --self when KITTY_WINDOW_ID unset ─
 echo "Test 10: Fallback to --match pid when no KITTY_WINDOW_ID"
 unset KITTY_WINDOW_ID
-rm -f "${TMPDIR_TEST}/.config/claude-notifier/.last-working-notify"
+rm -f "${TMPDIR_TEST}/.config/claude-notifier/".last-working-notify*
 > "$MOCK_LOG"
 echo "" | "$NOTIFIER" --state working
 sleep 0.5
@@ -287,7 +287,7 @@ fi
 # ── Test 15: New states accepted ──────────────
 echo "Test 15: New states accepted (researching, error, waiting)"
 export KITTY_WINDOW_ID="12345"
-rm -f "${TMPDIR_TEST}/.config/claude-notifier/.last-working-notify"
+rm -f "${TMPDIR_TEST}/.config/claude-notifier/".last-working-notify*
 for new_state in researching error waiting; do
   > "$MOCK_LOG"
   echo '{"session_id":"test-123"}' | "$NOTIFIER" --state "$new_state" --stdin
@@ -378,7 +378,7 @@ rm -f "${SESSIONS_DIR}/daemon-test-2.state"
 # ── Test 18: Full state lifecycle ─────────────
 echo "Test 18: Full state lifecycle (working → permission → working → done → cleanup)"
 export KITTY_WINDOW_ID="12345"
-rm -f "${TMPDIR_TEST}/.config/claude-notifier/.last-working-notify"
+rm -f "${TMPDIR_TEST}/.config/claude-notifier/".last-working-notify*
 mkdir -p "${TMPDIR_TEST}/.config/claude-notifier/sessions"
 > "$MOCK_LOG"
 
@@ -391,7 +391,7 @@ echo '{"session_id":"lifecycle-1","message":"Claude needs permission to use Bash
 sleep 0.3
 
 # Simulate: tool approved and completed
-rm -f "${TMPDIR_TEST}/.config/claude-notifier/.last-working-notify"
+rm -f "${TMPDIR_TEST}/.config/claude-notifier/".last-working-notify*
 echo '{"session_id":"lifecycle-1","tool_name":"Bash"}' | "$NOTIFIER" --state working --stdin
 sleep 0.3
 
@@ -418,6 +418,43 @@ else
   echo "  FAIL: state file not cleaned up"
   ((FAIL++)) || true
 fi
+
+# ── Test 19: Per-session debounce isolation ──────
+echo "Test 19: Per-session debounce — concurrent sessions don't block each other"
+export KITTY_WINDOW_ID="12345"
+rm -f "${TMPDIR_TEST}/.config/claude-notifier/".last-working-notify*
+> "$MOCK_LOG"
+# Two distinct sessions firing working state back-to-back within debounce window
+echo '{"session_id":"sess-A"}' | "$NOTIFIER" --state working --stdin
+sleep 0.3
+echo '{"session_id":"sess-B"}' | "$NOTIFIER" --state working --stdin
+sleep 0.5
+# Each session should have its own debounce file
+if [[ -f "${TMPDIR_TEST}/.config/claude-notifier/.last-working-notify-sess-A" ]]; then
+  echo "  PASS: sess-A debounce file created"
+  ((PASS++)) || true
+else
+  echo "  FAIL: sess-A debounce file missing"
+  ((FAIL++)) || true
+fi
+if [[ -f "${TMPDIR_TEST}/.config/claude-notifier/.last-working-notify-sess-B" ]]; then
+  echo "  PASS: sess-B debounce file created"
+  ((PASS++)) || true
+else
+  echo "  FAIL: sess-B debounce file missing"
+  ((FAIL++)) || true
+fi
+# Both sessions must have triggered visual updates (no cross-session debounce)
+sess_a_updates=$(grep -c "set-tab-title" "$MOCK_LOG" 2>/dev/null || echo 0)
+if [[ ${sess_a_updates} -ge 2 ]]; then
+  echo "  PASS: both sessions triggered tab updates (count=${sess_a_updates})"
+  ((PASS++)) || true
+else
+  echo "  FAIL: cross-session debounce blocked an update (count=${sess_a_updates})"
+  ((FAIL++)) || true
+fi
+rm -f "${TMPDIR_TEST}/.config/claude-notifier/sessions/sess-A.state"
+rm -f "${TMPDIR_TEST}/.config/claude-notifier/sessions/sess-B.state"
 
 # ── Cleanup ──────────────────────────────────────
 rm -rf "$TMPDIR_TEST"
