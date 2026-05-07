@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC1091  # dynamic source paths resolved at runtime
-# Claude Notifier v2.1.0 — main dispatcher
+# Claude Notifier v2.2.0 — main dispatcher
 # Called by Claude Code hooks to signal state changes to Kitty tabs
 #
 # Usage: claude-notifier --state <state> [--stdin]
@@ -40,7 +40,7 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     --version)
-      echo "claude-notifier 2.1.0"
+      echo "claude-notifier 2.2.0"
       exit 0
       ;;
     --help|-h)
@@ -142,9 +142,11 @@ if [[ -n "$SESSION_ID" ]]; then
 fi
 
 # ── Debounce visual updates (working state only) ──
+# Per-session debounce: concurrent Claude sessions must not block each other.
+# Falls back to "shared" when SESSION_ID is empty (e.g. no stdin JSON).
 if [[ "$STATE" == "working" ]]; then
   mkdir -p "$CLAUDE_NOTIFIER_DIR"
-  DEBOUNCE_FILE="${CLAUDE_NOTIFIER_DIR}/.last-working-notify"
+  DEBOUNCE_FILE="${CLAUDE_NOTIFIER_DIR}/.last-working-notify-${SESSION_ID:-shared}"
   now=$(date +%s)
   debounce_sec="${DEBOUNCE_WORKING:-3}"
   debounce_sec="${debounce_sec%%.*}"

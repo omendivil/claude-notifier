@@ -81,7 +81,7 @@ if [[ -d "$INSTALL_DIR" ]]; then
       ok "Removed ${INSTALL_DIR} (including config)"
     else
       rm -rf "${INSTALL_DIR:?}/bin" "${INSTALL_DIR:?}/lib" "${INSTALL_DIR:?}/sessions"
-      rm -f "${INSTALL_DIR}/.blink.pid" "${INSTALL_DIR}/.last-working-notify" "${INSTALL_DIR}/.daemon.pid"
+      rm -f "${INSTALL_DIR}/.blink.pid" "${INSTALL_DIR}"/.last-working-notify* "${INSTALL_DIR}/.daemon.pid"
       rm -rf "${INSTALL_DIR}/.daemon.lock"
       ok "Removed ${INSTALL_DIR} (config.conf preserved)"
     fi
