@@ -1,7 +1,8 @@
 ---
 last_updated: 2026-05-07
-purpose: Project rules for claude-notifier (Claude Code reads this; AGENTS.md mirrors it for Codex)
+purpose: Project rules for claude-notifier (Codex twin of CLAUDE.md)
 pairs_with_hub: ~/Dev/hub/claude-notifier/
+pairs_with_claude_md: ./CLAUDE.md
 ---
 
 # Claude Notifier
@@ -191,5 +192,5 @@ When Claude Code adds new hook events:
 
 - Hub partner: `~/Dev/hub/claude-notifier/` — research, planning, design notes
 - Global rules: `~/Dev/hub/global-rules/RULES.md`
-- Codex twin: `AGENTS.md` (in this repo) — mirror of this file for Codex CLI
+- Claude twin: `CLAUDE.md` (in this repo) — canonical; this file mirrors it for Codex CLI
 - Session continuity: `LEAVE-OFF.md` (in this repo) — current state, written at session end
